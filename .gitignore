@@ -11,12 +11,26 @@ env/
 .ipynb_checkpoints/
 
 # Data
-data/raw/
-data/interim/
-data/processed/
+data/raw/*
+data/interim/*
+data/processed/*
+
+# Keep folder structure
+!data/raw/.gitkeep
+!data/interim/.gitkeep
+!data/processed/.gitkeep
 
 # Models / outputs
-models/
+models/*
+!models/.gitkeep
+
+reports/figures/*
+!reports/figures/.gitkeep
+
+reports/final_report/*
+!reports/final_report/.gitkeep
+
+# Model artifacts
 *.pkl
 *.joblib
 *.pt
@@ -28,7 +42,3 @@ models/
 Thumbs.db
 .vscode/
 .idea/
-
-# Reports / misc generated files
-reports/figures/*.png
-reports/figures/*.jpg
