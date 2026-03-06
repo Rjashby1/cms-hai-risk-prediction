@@ -19,10 +19,10 @@ CMS Provider Data Catalog hospital downloadable databases:
 - Archived hospital releases for historical modeling
 
 ## Proposed Target
-Primary target:
+**Primary target:**
 - Payment Reduction (binary) from HAC Reduction Program
 
-Secondary targets:
+**Secondary targets:**
 - Total HAC Score
 - Composite high-risk HAI label
 
@@ -34,6 +34,8 @@ Secondary targets:
 - Evaluation: ROC-AUC, PR-AUC, recall, precision, calibration
 
 ## Repository Structure
+
+```text
 cms-hai-risk-prediction/
 ├── README.md
 ├── .gitignore
@@ -74,6 +76,7 @@ cms-hai-risk-prediction/
     ├── test_preprocessing.py
     ├── test_feature_engineering.py
     └── test_target_build.py
+```
 
 ## Reproducibility
 Raw data are not stored in this repository. See `data/README.md` for instructions on obtaining CMS source files.
