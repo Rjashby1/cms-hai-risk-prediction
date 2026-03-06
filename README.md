@@ -41,7 +41,9 @@ Raw data are not stored in this repository. See `data/README.md` for instruction
 
 ## Team
 - Robert Ashby
-- [Add teammates]
+- Xavier Colbert
+- Alysa Pugmire
+- Jasmine Waller
 
 ## Status
 In progress
