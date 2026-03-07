@@ -11,3 +11,6 @@ TIMELY_FILE = CMS_RAW_DIR / "Timely_and_Effective_Care-Hospital.csv"
 GENERAL_FILE = CMS_RAW_DIR / "Hospital_General_Information.csv"
 HAC_FILE = CMS_RAW_DIR / "FY_2026_HAC_Reduction_Program_Hospital.csv"
 DATA_DICTIONARY_FILE = CMS_RAW_DIR / "HOSPITAL_Data_Dictionary.pdf"
+
+INTERIM_DIR = DATA_DIR / "interim"
+PROCESSED_DIR = DATA_DIR / "processed"

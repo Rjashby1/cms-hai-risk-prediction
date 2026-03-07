@@ -1,11 +1,13 @@
 import pandas as pd
 from config import HAI_FILE, HCAHPS_FILE, TIMELY_FILE, GENERAL_FILE, HAC_FILE
+from pathlib import Path
+from config import INTERIM_DIR
 
-hai = pd.read_csv(HAI_FILE)
-hcahps = pd.read_csv(HCAHPS_FILE, low_memory=False)
-timely = pd.read_csv(TIMELY_FILE, low_memory=False)
-general = pd.read_csv(GENERAL_FILE)
-hac = pd.read_csv(HAC_FILE)
+hai = pd.read_csv(HAI_FILE, dtype={"Facility ID": "string"})
+hcahps = pd.read_csv(HCAHPS_FILE, dtype={"Facility ID": "string"}, low_memory=False)
+timely = pd.read_csv(TIMELY_FILE, dtype={"Facility ID": "string"}, low_memory=False)
+general = pd.read_csv(GENERAL_FILE, dtype={"Facility ID": "string"})
+hac = pd.read_csv(HAC_FILE, dtype={"Facility ID": "string"})
 
 print("HAI shape:", hai.shape)
 print("HCAHPS shape:", hcahps.shape)
@@ -24,3 +26,159 @@ print("HCAHPS unique Facility IDs:", hcahps["Facility ID"].nunique())
 print("Timely unique Facility IDs:", timely["Facility ID"].nunique())
 print("General unique Facility IDs:", general["Facility ID"].nunique())
 print("HAC unique Facility IDs:", hac["Facility ID"].nunique())
+
+print("\nHAC columns:")
+for col in hac.columns:
+    print(col)
+
+print("\nPayment Reduction value counts:")
+print(hac["Payment Reduction"].value_counts(dropna=False))
+
+hac_target = hac[["Facility ID", "Payment Reduction"]].copy()
+hac_target = hac_target.dropna(subset=["Payment Reduction"])
+hac_target["target"] = hac_target["Payment Reduction"].map({"No": 0, "Yes": 1})
+
+print("\nTarget shape:", hac_target.shape)
+print("\nTarget value counts:")
+print(hac_target["target"].value_counts(dropna=False))
+
+
+print("\nTarget unique Facility IDs:", hac_target["Facility ID"].nunique())
+print("Duplicate Facility IDs in target:", hac_target["Facility ID"].duplicated().sum())
+
+
+model_base = general.merge(hac_target, on="Facility ID", how="inner")
+
+print("\nModel base shape:", model_base.shape)
+print("Model base unique Facility IDs:", model_base["Facility ID"].nunique())
+
+
+INTERIM_DIR.mkdir(parents=True, exist_ok=True)
+
+output_path = INTERIM_DIR / "model_base.csv"
+model_base.to_csv(output_path, index=False)
+
+print("\nSaved model base to:")
+print(output_path)
+
+
+print("\nModel base columns:")
+for col in model_base.columns:
+    print(col)
+
+
+print("\nHCAHPS rows per Facility ID summary:")
+print(hcahps["Facility ID"].value_counts().describe())
+
+
+print("\nHCAHPS columns:")
+for col in hcahps.columns:
+    print(col)
+
+
+print("\nUnique HCAHPS Measure IDs:", hcahps["HCAHPS Measure ID"].nunique())
+print("\nTop HCAHPS Measure ID counts:")
+print(hcahps["HCAHPS Measure ID"].value_counts().head(20))
+
+
+print("\nNon-null counts in HCAHPS value columns:")
+print("Patient Survey Star Rating:", hcahps["Patient Survey Star Rating"].notna().sum())
+print("HCAHPS Answer Percent:", hcahps["HCAHPS Answer Percent"].notna().sum())
+print("HCAHPS Linear Mean Value:", hcahps["HCAHPS Linear Mean Value"].notna().sum())
+
+
+print("\nSample values from HCAHPS value columns:")
+print("\nPatient Survey Star Rating:")
+print(hcahps["Patient Survey Star Rating"].astype(str).value_counts().head(10))
+
+print("\nHCAHPS Answer Percent:")
+print(hcahps["HCAHPS Answer Percent"].astype(str).value_counts().head(10))
+
+print("\nHCAHPS Linear Mean Value:")
+print(hcahps["HCAHPS Linear Mean Value"].astype(str).value_counts().head(10))
+
+
+hcahps["star_rating_num"] = pd.to_numeric(hcahps["Patient Survey Star Rating"], errors="coerce")
+hcahps["answer_percent_num"] = pd.to_numeric(hcahps["HCAHPS Answer Percent"], errors="coerce")
+hcahps["linear_mean_num"] = pd.to_numeric(hcahps["HCAHPS Linear Mean Value"], errors="coerce")
+
+print("\nNumeric HCAHPS value counts after coercion:")
+print("star_rating_num:", hcahps["star_rating_num"].notna().sum())
+print("answer_percent_num:", hcahps["answer_percent_num"].notna().sum())
+print("linear_mean_num:", hcahps["linear_mean_num"].notna().sum())
+
+
+hcahps_measure_summary = (
+    hcahps.groupby("HCAHPS Measure ID")[["star_rating_num", "answer_percent_num", "linear_mean_num"]]
+    .apply(lambda x: x.notna().sum())
+)
+
+print("\nHCAHPS measure summary:")
+print(hcahps_measure_summary.head(20))
+
+
+hcahps["hcahps_value"] = (
+    hcahps["answer_percent_num"]
+    .combine_first(hcahps["linear_mean_num"])
+    .combine_first(hcahps["star_rating_num"])
+)
+
+print("\nUnified HCAHPS numeric values:", hcahps["hcahps_value"].notna().sum())
+print(
+    "Duplicate Facility ID + HCAHPS Measure ID rows:",
+    hcahps.duplicated(subset=["Facility ID", "HCAHPS Measure ID"]).sum()
+)
+
+
+hcahps_wide = hcahps.pivot(
+    index="Facility ID",
+    columns="HCAHPS Measure ID",
+    values="hcahps_value"
+).reset_index()
+
+print("\nHCAHPS wide shape:", hcahps_wide.shape)
+print("HCAHPS wide unique Facility IDs:", hcahps_wide["Facility ID"].nunique())
+
+
+model_with_hcahps = model_base.merge(hcahps_wide, on="Facility ID", how="left")
+
+print("\nModel with HCAHPS shape:", model_with_hcahps.shape)
+print("Model with HCAHPS unique Facility IDs:", model_with_hcahps["Facility ID"].nunique())
+
+
+hcahps_feature_cols = [col for col in hcahps_wide.columns if col != "Facility ID"]
+model_with_hcahps["hcahps_nonnull_count"] = model_with_hcahps[hcahps_feature_cols].notna().sum(axis=1)
+
+print("\nHCAHPS non-null feature count summary:")
+print(model_with_hcahps["hcahps_nonnull_count"].describe())
+
+
+print("\nHCAHPS completeness counts:")
+print(model_with_hcahps["hcahps_nonnull_count"].value_counts().sort_index())
+
+print("\nHospitals with zero HCAHPS features:")
+print((model_with_hcahps["hcahps_nonnull_count"] == 0).sum())
+
+
+print("\nTarget by HCAHPS completeness:")
+print(
+    pd.crosstab(
+        model_with_hcahps["hcahps_nonnull_count"],
+        model_with_hcahps["target"],
+        margins=True
+    )
+)
+
+
+print("\nTimely rows per Facility ID summary:")
+print(timely["Facility ID"].value_counts().describe())
+
+
+print("\nTimely columns:")
+for col in timely.columns:
+    print(col)
+
+
+print("\nUnique Timely Measure IDs:", timely["Measure ID"].nunique())
+print("\nTop Timely Measure ID counts:")
+print(timely["Measure ID"].value_counts().head(20))
