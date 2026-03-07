@@ -182,3 +182,72 @@ for col in timely.columns:
 print("\nUnique Timely Measure IDs:", timely["Measure ID"].nunique())
 print("\nTop Timely Measure ID counts:")
 print(timely["Measure ID"].value_counts().head(20))
+
+
+print("\nTop Timely Score values:")
+print(timely["Score"].astype(str).value_counts().head(20))
+
+
+timely["score_num"] = pd.to_numeric(timely["Score"], errors="coerce")
+
+print("\nNumeric Timely score count:", timely["score_num"].notna().sum())
+print("Total Timely rows:", len(timely))
+
+
+timely_measure_summary = timely.groupby("Measure ID")["score_num"].apply(lambda x: x.notna().sum())
+
+print("\nTimely numeric score counts by Measure ID:")
+print(timely_measure_summary.sort_values(ascending=False))
+
+
+timely_numeric = timely[timely["score_num"].notna()].copy()
+
+timely_wide = timely_numeric.pivot(
+    index="Facility ID",
+    columns="Measure ID",
+    values="score_num"
+).reset_index()
+
+print("\nTimely wide shape:", timely_wide.shape)
+print("Timely wide unique Facility IDs:", timely_wide["Facility ID"].nunique())
+
+
+model_with_hcahps_timely = model_with_hcahps.merge(timely_wide, on="Facility ID", how="left")
+
+print("\nModel with HCAHPS + Timely shape:", model_with_hcahps_timely.shape)
+print("Model with HCAHPS + Timely unique Facility IDs:", model_with_hcahps_timely["Facility ID"].nunique())
+
+
+timely_feature_cols = [col for col in timely_wide.columns if col != "Facility ID"]
+model_with_hcahps_timely["timely_nonnull_count"] = model_with_hcahps_timely[timely_feature_cols].notna().sum(axis=1)
+
+print("\nTimely non-null feature count summary:")
+print(model_with_hcahps_timely["timely_nonnull_count"].describe())
+
+
+print("\nTimely completeness counts:")
+print(model_with_hcahps_timely["timely_nonnull_count"].value_counts().sort_index())
+
+print("\nHospitals with zero Timely features:")
+print((model_with_hcahps_timely["timely_nonnull_count"] == 0).sum())
+
+
+print("\nTarget by Timely completeness:")
+print(
+    pd.crosstab(
+        model_with_hcahps_timely["timely_nonnull_count"],
+        model_with_hcahps_timely["target"],
+        margins=True
+    )
+)
+
+
+output_path_2 = INTERIM_DIR / "model_with_hcahps_timely.csv"
+model_with_hcahps_timely.to_csv(output_path_2, index=False)
+
+print("\nSaved model with HCAHPS + Timely to:")
+print(output_path_2)
+
+
+print("\nFinal merged file shape:", model_with_hcahps_timely.shape)
+print("Final merged file columns:", len(model_with_hcahps_timely.columns))
