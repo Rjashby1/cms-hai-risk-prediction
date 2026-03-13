@@ -1,36 +1,38 @@
 import pandas as pd
 from pathlib import Path
+import os
 
-def load_raw_data(data_dir="../data"):
+def load_all_raw_data(data_dir="../data/raw/cms_hospitals_jan2026"):
     """
-    Loads the four primary CMS CSV files from the specified data directory.
+    Dynamically loads ALL CSV files found in the target directory.
     Returns a dictionary of pandas DataFrames.
     """
-    # Resolve the path relative to where the script is being executed
-    data_path = Path(data_dir).resolve()
-    
-    files = {
-        "hai": data_path / "Healthcare_Associated_Infections-Hospital.csv",
-        "hcahps": data_path / "HCAHPS-Hospital.csv",
-        "timely": data_path / "Timely_and_Effective_Care-Hospital.csv",
-        "general": data_path / "Hospital_General_Information.csv",
-    }
+    current_dir = Path(__file__).parent
+    data_path = (current_dir / data_dir).resolve()
     
     data_frames = {}
     
-    print(f"Looking for data in: {data_path}\n" + "-"*40)
+    print(f"Scanning directory: {data_path}\n" + "-"*50)
     
-    for name, filepath in files.items():
+    if not data_path.exists():
+        print(f"[ERROR] Path does not exist: {data_path}")
+        return data_frames
+
+    # Find all CSV files in the directory
+    csv_files = list(data_path.glob("*.csv"))
+    print(f"Found {len(csv_files)} CSV files. Beginning import...\n")
+    
+    for filepath in csv_files:
+        name = filepath.stem # Gets the filename without the .csv extension
         try:
-            # low_memory=False prevents mixed-type warnings on large CMS datasets
-            data_frames[name] = pd.read_csv(filepath, low_memory=False)
-            print(f"[SUCCESS] Loaded '{name}': {data_frames[name].shape[0]} rows, {data_frames[name].shape[1]} columns")
-        except FileNotFoundError:
-            print(f"[ERROR] Could not find {filepath.name}")
+            # Load with low_memory=False to handle mixed types in large files
+            df = pd.read_csv(filepath, low_memory=False)
+            data_frames[name] = df
+            print(f"[LOADED] {name[:40]:<40} | Rows: {df.shape[0]:<7} | Cols: {df.shape[1]}")
+        except Exception as e:
+            print(f"[FAILED] {name} - Error: {e}")
             
     return data_frames
 
 if __name__ == "__main__":
-    # This block only runs if you execute this specific file directly in the terminal
-    print("Testing data import module...\n")
-    df_dict = load_raw_data()
+    df_dict = load_all_raw_data()
