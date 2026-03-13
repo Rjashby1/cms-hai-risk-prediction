@@ -1,90 +1,41 @@
 # CMS HAI Risk Prediction
 
 ## Project Overview
-This project uses CMS hospital quality datasets to develop a machine learning model that predicts whether a hospital is at elevated risk for hospital-acquired infection (HAI)-related safety outcomes.
+This project leverages CMS hospital quality datasets to develop a machine learning pipeline that predicts whether a facility is at elevated risk for Healthcare-Associated Infection (HAI) safety outcomes. By integrating disparate clinical and administrative datasets, we aim to provide a data-driven early warning for hospital safety administrators.
 
 ## Objective
-Build a predictive model using hospital characteristics, patient experience measures, and care-process indicators to identify facilities at higher risk of adverse HAI-related outcomes.
+Build a predictive model using hospital characteristics, patient experience (HCAHPS) measures, and care-process indicators to identify facilities at higher risk of adverse HAI-related outcomes.
 
 ## Research Question
-Can publicly available CMS hospital quality data be used to predict future HAI-related risk at the facility level?
+Can publicly available, high-dimensional CMS hospital quality data be used to predict facility-level HAI risk through automated feature mining?
 
 ## Data Source
-CMS Provider Data Catalog hospital downloadable databases:
-- Healthcare Associated Infections
-- HCAHPS
-- Timely and Effective Care
+CMS Provider Data Catalog hospital downloadable databases (Current Release: Jan 2026).
+- Healthcare Associated Infections (HAI_1 through HAI_6)
+- HCAHPS (Patient Surveys)
+- Timely and Effective Care (Sepsis, Immunization)
 - Hospital General Information
 - HAC Reduction Program files
-- Archived hospital releases for historical modeling
 
-## Proposed Target
-Primary target:
-- Payment Reduction (binary) from HAC Reduction Program
-
-Secondary targets:
-- Total HAC Score
-- Composite high-risk HAI label
-
-## Methods
-- Data cleaning and harmonization by Facility ID
-- Feature engineering across hospital-level CMS tables
-- Baseline models: logistic regression, random forest, gradient boosting
-- Deep learning model: feedforward neural network for tabular classification
-- Evaluation: ROC-AUC, PR-AUC, recall, precision, calibration
+## Modeling Target
+**Primary Target (`HAI_at_risk`):** A binary indicator (1/0) where 1 represents a facility performing "Worse than the National Benchmark" on **any** of the six primary HAI Standardized Infection Ratio (SIR) measures.
 
 ## Repository Structure
 ```text
 cms-hai-risk-prediction/
-├── README.md
-├── .gitignore
-├── requirements.txt
-├── environment.yml
-├── LICENSE
-├── data/
-│   ├── README.md
-│   ├── raw/                # ignored by git
-│   ├── interim/            # ignored by git
-│   └── processed/          # ignored by git
-├── notebooks/
-│   ├── 01_data_audit.ipynb
-│   ├── 02_eda.ipynb
-│   ├── 03_feature_engineering.ipynb
-│   ├── 04_baseline_models.ipynb
-│   └── 05_deep_learning_model.ipynb
-├── src/
-│   ├── __init__.py
-│   ├── config.py
-│   ├── data_loading.py
-│   ├── preprocessing.py
-│   ├── feature_engineering.py
-│   ├── build_target.py
-│   ├── train_baselines.py
-│   ├── train_deep_model.py
-│   ├── evaluate.py
-│   └── utils.py
-├── models/                 # ignored by git
-├── reports/
-│   ├── figures/
-│   └── final_report/
-├── docs/
-│   ├── project_scope.md
-│   ├── data_dictionary_notes.md
-│   └── modeling_plan.md
-└── tests/
-    ├── test_preprocessing.py
-    ├── test_feature_engineering.py
-    └── test_target_build.py
-```
-
-## Reproducibility
-Raw data are not stored in this repository. See `data/README.md` for instructions on obtaining CMS source files.
-
-## Team
-- Robert Ashby
-- Xavier Colbert
-- Alysa Pugmire
-- Jasmine Waller
-
-## Status
-In progress
+├── README.md               # Project documentation
+├── .gitignore              # Configured to ignore data/ and code/archive/
+├── environment.yml         # Conda env with XGBoost, LightGBM, Optuna
+├── main_pipeline.ipynb     # Central orchestrator for the project
+├── code/                   # Modular Python scripts
+│   ├── 00_download_data.py # Automated data retrieval from CMS
+│   ├── 01_data_import.py   # Bulk ingestion of 70+ CSVs
+│   ├── 02_data_interpretation.py
+│   ├── 03_data_processing.py # Ground truth construction
+│   ├── 04_data_analysis.py   # Automated EDA & visualization
+│   └── archive/            # Local-only research scripts (ignored)
+├── data/                   # (Ignored by Git)
+│   ├── raw/                # Original CMS CSVs
+│   ├── interim/            # Inventory profiles
+│   └── processed/          # Final modeling datasets
+└── models/                 # Saved .pkl and .joblib models (ignored)
