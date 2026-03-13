@@ -2,7 +2,10 @@
 # DATA & MODELS
 # ---------------------------------------------------
 # Ignore the entire data folder (and any subfolders like data/archive/)
-data/
+data/raw/
+data/processed/
+data/archive/
+data/interim/
 
 # Also ignore loose heavy files just in case they end up outside the data folder
 *.csv
