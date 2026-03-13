@@ -26,6 +26,7 @@ models/
 code/archive/
 *.ipynb
 *.py
+*.html
 
 # ---------------------------------------------------
 # PYTHON & JUPYTER

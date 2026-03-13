@@ -1,6 +1,7 @@
 import pandas as pd
 from pathlib import Path
-import code.01_data_import as di # Assumes your files are in the code/ folder
+import importlib
+di = importlib.import_module("01_data_import")
 
 def generate_data_profile(df_dict, output_dir="../data/interim"):
     """

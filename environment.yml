@@ -1,12 +1,21 @@
 name: cms-hai-risk-prediction
 channels:
   - conda-forge
+  - defaults
 dependencies:
-  - python=3.11
+  - python=3.12
   - pandas
   - numpy
-  - scikit-learn
   - matplotlib
+  - seaborn
+  - scipy
+  - scikit-learn
+  - xgboost
+  - lightgbm
+  - optuna        # For automated hyperparameter optimization
+  - imbalanced-learn # For handling the 3.6% class imbalance (SMOTE)
+  - joblib
   - jupyter
-  - ipykernel
-  - pip
+  - requests
+  - pathlib
+  - pyyaml
