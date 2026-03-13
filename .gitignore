@@ -1,7 +1,10 @@
 # ---------------------------------------------------
-# DATA & MODELS (Prevents the 100MB GitHub Error)
+# DATA & MODELS
 # ---------------------------------------------------
+# Ignore the entire data folder (and any subfolders like data/archive/)
 data/
+
+# Also ignore loose heavy files just in case they end up outside the data folder
 *.csv
 *.zip
 *.gz
@@ -15,6 +18,11 @@ models/
 *.pt
 
 # ---------------------------------------------------
+# CODE ARCHIVES
+# ---------------------------------------------------
+code/archive/
+
+# ---------------------------------------------------
 # PYTHON & JUPYTER
 # ---------------------------------------------------
 __pycache__/
@@ -22,19 +30,3 @@ __pycache__/
 *$py.class
 .ipynb_checkpoints/
 
-# ---------------------------------------------------
-# ENVIRONMENTS
-# ---------------------------------------------------
-.env
-.venv
-env/
-venv/
-conda_env/
-
-# ---------------------------------------------------
-# OS & IDE FILES
-# ---------------------------------------------------
-.DS_Store
-Thumbs.db
-.vscode/
-.idea/
