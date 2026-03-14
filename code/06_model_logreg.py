@@ -19,5 +19,3 @@ def run_baseline_logreg(data, target, features):
     cv = StratifiedKFold(n_splits=5, random_state=5, shuffle=True)
 
     # Build preprecessing for pipeline
-
-

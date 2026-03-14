@@ -24,9 +24,7 @@ models/
 # CODE ARCHIVES
 # ---------------------------------------------------
 code/archive/
-*.ipynb
-*.py
-*.html
+code/*.html
 
 # ---------------------------------------------------
 # PYTHON & JUPYTER
