@@ -3,8 +3,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from pathlib import Path
-from typing import Dict, Iterable, Optional, Union
+from typing import Dict, Iterable, Optional
 
+from sklearn.inspection import permutation_importance
 from sklearn.metrics import (
     ConfusionMatrixDisplay,
     average_precision_score,
@@ -19,6 +20,45 @@ from sklearn.metrics import (
     roc_auc_score,
     roc_curve,
 )
+
+
+DEFAULT_FRIENDLY_LABELS = {
+    "PSI_90": "Serious complications composite (PSI-90)",
+    "PSI_03": "Pressure ulcer rate",
+    "PSI_06": "Iatrogenic pneumothorax rate",
+    "PSI_08": "Postoperative hip fracture rate",
+    "PSI_09": "Postoperative hemorrhage or hematoma rate",
+    "PSI_10": "Postoperative kidney or metabolic complication rate",
+    "PSI_11": "Postoperative respiratory failure rate",
+    "PSI_12": "Postoperative pulmonary embolism or DVT rate",
+    "PSI_13": "Postoperative sepsis rate",
+    "PSI_14": "Postoperative wound dehiscence rate",
+    "PSI_15": "Accidental puncture or laceration rate",
+    "Hybrid_HWM": "Hospital-wide all-cause mortality rate",
+    "Hybrid_HWR": "Hospital-wide all-cause readmission rate",
+    "MORT_30_COPD": "30-day mortality rate for COPD patients",
+    "MORT_30_HF": "30-day mortality rate for heart failure patients",
+    "MORT_30_PN": "30-day mortality rate for pneumonia patients",
+    "OP_18a": "ED time before departure, all patients",
+    "OP_18b": "ED time before departure, excluding transfers and psych patients",
+    "OP_18c": "ED time before discharge home, psych/mental health patients",
+    "OP_22": "Percent leaving ED before being seen",
+    "OP_23": "Percent receiving brain scan results within 45 minutes for stroke symptoms",
+    "SEP_1": "Sepsis and septic shock bundle performance",
+    "SEP_SH_3HR": "Septic shock 3-hour bundle performance",
+    "SEP_SH_6HR": "Septic shock 6-hour bundle performance",
+    "SEV_SEP_3HR": "Severe sepsis 3-hour bundle performance",
+    "SEV_SEP_6HR": "Severe sepsis 6-hour bundle performance",
+    "EDAC_30_HF": "Excess days in acute care after heart failure hospitalization",
+    "EDAC_30_PN": "Excess days in acute care after pneumonia hospitalization",
+    "READM_30_COPD": "30-day readmission rate for COPD patients",
+    "READM_30_HF": "30-day readmission rate for heart failure patients",
+    "READM_30_PN": "30-day readmission rate for pneumonia patients",
+    "OP_32": "Unplanned hospital visits after outpatient colonoscopy",
+    "OP_36": "Ratio of unplanned hospital visits after outpatient surgery",
+    "MSPB-1_x": "Medicare spending per beneficiary",
+    "MSPB-1_y": "Medicare spending per beneficiary",
+}
 
 
 def _ensure_dir(path_like) -> Path:
@@ -52,9 +92,43 @@ def _safe_predict_proba(model, X):
 
         return (scores - score_min) / (score_max - score_min)
 
-    raise AttributeError(
-        "Model must implement predict_proba() or decision_function()."
+    raise AttributeError("Model must implement predict_proba() or decision_function().")
+
+
+def relabel_feature(name: str, friendly_labels: Optional[dict] = None) -> str:
+    """
+    Convert raw pipeline feature names into more readable labels.
+    """
+    label_map = DEFAULT_FRIENDLY_LABELS.copy()
+    if friendly_labels is not None:
+        label_map.update(friendly_labels)
+
+    if name.startswith("num__"):
+        raw = name.replace("num__", "")
+        return label_map.get(raw, raw)
+
+    if name.startswith("cat__"):
+        raw = name.replace("cat__", "")
+        raw = raw.replace("_", " = ", 1)
+        return raw
+
+    return label_map.get(name, name)
+
+
+def relabel_importance_table(
+    importance_df: pd.DataFrame,
+    feature_col: str = "feature",
+    new_col: str = "feature_label",
+    friendly_labels: Optional[dict] = None,
+) -> pd.DataFrame:
+    """
+    Add a readable feature-label column to an importance table.
+    """
+    out_df = importance_df.copy()
+    out_df[new_col] = out_df[feature_col].apply(
+        lambda x: relabel_feature(str(x), friendly_labels=friendly_labels)
     )
+    return out_df
 
 
 def evaluate_classifier(
@@ -69,30 +143,6 @@ def evaluate_classifier(
 ):
     """
     Evaluate a fitted classifier on a held-out dataset.
-
-    Parameters
-    ----------
-    model : fitted classifier or pipeline
-        Trained model with predict_proba() or decision_function().
-    X_eval : pd.DataFrame or array-like
-        Evaluation features.
-    y_eval : pd.Series or array-like
-        True labels.
-    model_name : str
-        Display name for reporting.
-    threshold : float, default=0.50
-        Probability threshold for positive-class prediction.
-    save_confusion_plot : bool, default=False
-        If True, saves a confusion matrix plot to reports/figures.
-    figures_dir : str, default="../reports/figures"
-        Output directory for figures.
-    normalize_confusion : {"true", "pred", "all", None}, default=None
-        Optional normalization mode for confusion matrix display.
-
-    Returns
-    -------
-    dict
-        Dictionary containing summary metrics and detailed outputs.
     """
     y_true = np.asarray(y_eval)
     y_prob = _safe_predict_proba(model, X_eval)
@@ -130,6 +180,7 @@ def evaluate_classifier(
 
     if save_confusion_plot:
         out_dir = _get_output_dir(figures_dir)
+
         fig, ax = plt.subplots(figsize=(6, 5))
         disp = ConfusionMatrixDisplay(confusion_matrix=cm)
         disp.plot(ax=ax, values_format="d", cmap="Blues", colorbar=False)
@@ -165,28 +216,6 @@ def compare_models(
 ):
     """
     Evaluate multiple fitted models on the same held-out dataset.
-
-    Parameters
-    ----------
-    models : dict
-        Dictionary like {"Logistic Regression": fitted_model, ...}
-    X_eval : pd.DataFrame or array-like
-        Evaluation features.
-    y_eval : pd.Series or array-like
-        True labels.
-    threshold : float, default=0.50
-        Probability threshold for positive-class prediction.
-    save_csv : bool, default=False
-        If True, save the summary table to data/processed.
-    csv_name : str, default="heldout_model_comparison.csv"
-        Filename for saved CSV.
-    output_dir : str, default="../data/processed"
-        Output directory for tables.
-
-    Returns
-    -------
-    pd.DataFrame
-        Summary comparison table sorted by ROC-AUC descending.
     """
     rows = []
 
@@ -238,11 +267,6 @@ def threshold_sweep(
 ):
     """
     Evaluate one fitted model across multiple probability thresholds.
-
-    Returns
-    -------
-    pd.DataFrame
-        Threshold-level metric table.
     """
     if thresholds is None:
         thresholds = np.arange(0.10, 0.91, 0.05)
@@ -361,11 +385,6 @@ def get_feature_names_from_pipeline(fitted_pipeline):
     """
     Recover transformed feature names from a fitted sklearn Pipeline
     containing a 'preprocess' step.
-
-    Returns
-    -------
-    list[str]
-        Feature names after preprocessing.
     """
     if not hasattr(fitted_pipeline, "named_steps"):
         raise ValueError("Expected a fitted sklearn Pipeline.")
@@ -389,14 +408,11 @@ def extract_logreg_importance(
     save_csv: bool = False,
     csv_name: str = "logreg_feature_importance.csv",
     output_dir: str = "../data/processed",
+    relabel: bool = False,
+    friendly_labels: Optional[dict] = None,
 ):
     """
     Extract coefficient-based importance from a fitted Logistic Regression pipeline.
-
-    Returns
-    -------
-    pd.DataFrame
-        Feature importance table with signed coefficients and odds ratios.
     """
     if "logreg" not in fitted_pipeline.named_steps:
         raise ValueError("Pipeline does not contain a 'logreg' step.")
@@ -410,6 +426,14 @@ def extract_logreg_importance(
         "abs_coefficient": np.abs(coefs),
         "odds_ratio": np.exp(coefs),
     })
+
+    if relabel:
+        imp_df = relabel_importance_table(
+            imp_df,
+            feature_col="feature",
+            new_col="feature_label",
+            friendly_labels=friendly_labels,
+        )
 
     if sort_by_abs:
         imp_df = imp_df.sort_values("abs_coefficient", ascending=False)
@@ -436,21 +460,11 @@ def extract_tree_importance(
     save_csv: bool = False,
     csv_name: Optional[str] = None,
     output_dir: str = "../data/processed",
+    relabel: bool = False,
+    friendly_labels: Optional[dict] = None,
 ):
     """
     Extract feature importance from a fitted tree-based pipeline.
-
-    Parameters
-    ----------
-    fitted_pipeline : sklearn Pipeline
-        Fitted pipeline with preprocessing and a tree-based estimator.
-    model_step_name : str
-        Step name of estimator, e.g. 'rf' or 'xgb'.
-
-    Returns
-    -------
-    pd.DataFrame
-        Feature importance table.
     """
     if model_step_name not in fitted_pipeline.named_steps:
         raise ValueError(f"Pipeline does not contain a '{model_step_name}' step.")
@@ -466,7 +480,17 @@ def extract_tree_importance(
     imp_df = pd.DataFrame({
         "feature": feature_names,
         "importance": importances,
-    }).sort_values("importance", ascending=False)
+    })
+
+    if relabel:
+        imp_df = relabel_importance_table(
+            imp_df,
+            feature_col="feature",
+            new_col="feature_label",
+            friendly_labels=friendly_labels,
+        )
+
+    imp_df = imp_df.sort_values("importance", ascending=False)
 
     if top_n is not None:
         imp_df = imp_df.head(top_n).reset_index(drop=True)
@@ -479,6 +503,62 @@ def extract_tree_importance(
             csv_name = f"{model_step_name}_feature_importance.csv"
         imp_df.to_csv(out_dir / csv_name, index=False)
         print(f"[SUCCESS] Saved {model_step_name} importance table to {out_dir / csv_name}")
+
+    return imp_df
+
+
+def extract_permutation_importance(
+    fitted_pipeline,
+    X_eval,
+    y_eval,
+    scoring: str = "roc_auc",
+    n_repeats: int = 20,
+    random_seed: int = 42,
+    top_n: Optional[int] = 20,
+    save_csv: bool = False,
+    csv_name: str = "permutation_feature_importance.csv",
+    output_dir: str = "../data/processed",
+    relabel: bool = False,
+    friendly_labels: Optional[dict] = None,
+):
+    """
+    Extract permutation importance on an evaluation dataset.
+    """
+    result = permutation_importance(
+        fitted_pipeline,
+        X_eval,
+        y_eval,
+        scoring=scoring,
+        n_repeats=n_repeats,
+        random_state=random_seed,
+        n_jobs=-1,
+    )
+
+    feature_names = get_feature_names_from_pipeline(fitted_pipeline)
+
+    imp_df = pd.DataFrame({
+        "feature": feature_names,
+        "importance_mean": result.importances_mean,
+        "importance_std": result.importances_std,
+    }).sort_values("importance_mean", ascending=False)
+
+    if relabel:
+        imp_df = relabel_importance_table(
+            imp_df,
+            feature_col="feature",
+            new_col="feature_label",
+            friendly_labels=friendly_labels,
+        )
+
+    if top_n is not None:
+        imp_df = imp_df.head(top_n).reset_index(drop=True)
+    else:
+        imp_df = imp_df.reset_index(drop=True)
+
+    if save_csv:
+        out_dir = _get_table_dir(output_dir)
+        imp_df.to_csv(out_dir / csv_name, index=False)
+        print(f"[SUCCESS] Saved permutation importance table to {out_dir / csv_name}")
 
     return imp_df
 
