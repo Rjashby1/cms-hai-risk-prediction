@@ -5,119 +5,180 @@ from sklearn.pipeline import Pipeline
 from xgboost import XGBClassifier
 
 
-def build_xgb_pipeline(preprocess, scale_pos_weight=None, random_seed=42):
-    '''
-    Builds the XGBoost model pipeline.
+def build_xgb_pipeline(
+    preprocess,
+    scale_pos_weight=None,
+    random_seed=42,
+):
+    """
+    Build an XGBoost modeling pipeline.
 
-    Parameters:
-    preprocess (Pipeline): Preprocessing pipeline to apply to the data.
-    scale_pos_weight (float, optional): Balancing of positive and negative weights. Default is None.
-    random_seed (int, optional): Random seed for reproducibility.
+    Parameters
+    ----------
+    preprocess : sklearn transformer or pipeline
+        Preprocessing object to apply before model fitting.
+    scale_pos_weight : float or None, default=None
+        Positive-class weighting factor used to address class imbalance.
+    random_seed : int, default=42
+        Random seed for reproducibility.
 
-    Returns:
-    Pipeline: A sklearn Pipeline with preprocessing and XGBoost.
-    '''
+    Returns
+    -------
+    sklearn Pipeline
+        Pipeline containing preprocessing and XGBoost.
+    """
+    model = XGBClassifier(
+        scale_pos_weight=scale_pos_weight,
+        eval_metric="logloss",
+        random_state=random_seed,
+        n_jobs=1,
+        verbosity=0,
+    )
 
     pipe = Pipeline([
-        ('preprocess', preprocess),
-        ('xgb', XGBClassifier(
-            scale_pos_weight=scale_pos_weight,
-            eval_metric='logloss',
-            random_state=random_seed
-        ))
+        ("preprocess", preprocess),
+        ("xgb", model),
     ])
 
     return pipe
 
 
 def define_xgb_grid():
-    '''Defines the hyperparameter grid for XGBoost.'''
+    """
+    Define the hyperparameter search space for XGBoost.
 
+    Returns
+    -------
+    dict
+        Parameter search space for RandomizedSearchCV.
+    """
     params = {
-        'xgb__n_estimators': randint(100, 500),
-        'xgb__learning_rate': loguniform(0.01, 0.3),
-        'xgb__max_depth': randint(3, 10),
-        'xgb__min_child_weight': randint(1, 6),
-        'xgb__subsample': np.linspace(0.6, 1.0, 5),
-        'xgb__colsample_bytree': np.linspace(0.6, 1.0, 5)
+        "xgb__n_estimators": randint(100, 500),
+        "xgb__learning_rate": loguniform(0.01, 0.3),
+        "xgb__max_depth": randint(3, 10),
+        "xgb__min_child_weight": randint(1, 6),
+        "xgb__subsample": np.linspace(0.6, 1.0, 5),
+        "xgb__colsample_bytree": np.linspace(0.6, 1.0, 5),
     }
 
     return params
 
 
-def tune_xgb_model(pipe, params, cv, Xtrain, ytrain, n_iter=50, scoring='roc_auc', random_seed=42, n_jobs=-1):
-    '''
-    Tunes the XGBoost model using RandomizedSearchCV.
+def tune_xgb_model(
+    pipe,
+    params,
+    cv,
+    Xtrain,
+    ytrain,
+    n_iter=50,
+    scoring="roc_auc",
+    random_seed=42,
+    n_jobs=-1,
+):
+    """
+    Tune an XGBoost pipeline using RandomizedSearchCV.
 
-    Parameters:
-    pipe (Pipeline): The pipeline containing the XGBoost model.
-    params (dict): The hyperparameter grid for tuning.
-    cv (StratifiedKFold): Cross-validation strategy.
-    Xtrain (array-like): Training features.
-    ytrain (array-like): Training labels.
-    n_iter (int, optional): Number of iterations for RandomizedSearchCV. Default is 50.
-    scoring (str, optional): Scoring metric for RandomizedSearchCV. Default is 'roc_auc'.
-    random_seed (int, optional): Random seed for reproducibility. Default is 42.
-    n_jobs (int, optional): Number of parallel jobs for RandomizedSearchCV. Default is -1.
+    Parameters
+    ----------
+    pipe : sklearn Pipeline
+        Pipeline containing preprocessing and XGBoost.
+    params : dict
+        Hyperparameter search space.
+    cv : cross-validation splitter
+        Cross-validation object such as StratifiedKFold.
+    Xtrain : array-like or DataFrame
+        Training features.
+    ytrain : array-like or Series
+        Training labels.
+    n_iter : int, default=50
+        Number of random search iterations.
+    scoring : str, default="roc_auc"
+        Model selection metric.
+    random_seed : int, default=42
+        Random seed for reproducibility.
+    n_jobs : int, default=-1
+        Number of parallel jobs.
 
-    Returns:
-    RandomizedSearchCV: The fitted RandomizedSearchCV object containing the best model and results.
-    '''
-
+    Returns
+    -------
+    RandomizedSearchCV
+        Fitted randomized search object.
+    """
     xgb_cv = RandomizedSearchCV(
-    estimator=pipe,
-    param_distributions=params,
-    n_iter=n_iter,
-    cv=cv,
-    scoring=scoring,
-    random_state=random_seed,
-    n_jobs=n_jobs,
-    verbose=2,
-    return_train_score=True
+        estimator=pipe,
+        param_distributions=params,
+        n_iter=n_iter,
+        cv=cv,
+        scoring=scoring,
+        random_state=random_seed,
+        n_jobs=n_jobs,
+        verbose=2,
+        return_train_score=True,
+        refit=True,
     )
-    
-    xgb_cv.fit(Xtrain, ytrain)
 
+    xgb_cv.fit(Xtrain, ytrain)
     return xgb_cv
 
 
-def run_xgb_model(preprocess, cv, Xtrain, ytrain, scale_pos_weight=None, random_seed=42, n_iter=50, scoring='roc_auc', n_jobs=-1):
-    '''
-    Runs the entire process of building, tuning, and fitting the XGBoost model.
+def run_xgb_model(
+    preprocess,
+    cv,
+    Xtrain,
+    ytrain,
+    scale_pos_weight=None,
+    random_seed=42,
+    n_iter=50,
+    scoring="roc_auc",
+    n_jobs=-1,
+):
+    """
+    Run the full XGBoost workflow: build, tune, and fit.
 
-    Parameters:
-    preprocess (Pipeline): Preprocessing pipeline to apply to the data.
-    cv (StratifiedKFold): Cross-validation strategy.
-    Xtrain (array-like): Training features.
-    ytrain (array-like): Training labels.
-    scale_pos_weight (float, optional): Balancing of positive and negative weights. Default is None.
-    random_seed (int, optional): Random seed for reproducibility. Default is 42.
-    n_iter (int, optional): Number of iterations for RandomizedSearchCV. Default is 50.
-    scoring (str, optional): Scoring metric for RandomizedSearchCV. Default is 'roc_auc'.
-    n_jobs (int, optional): Number of parallel jobs for RandomizedSearchCV. Default is -1.
+    Parameters
+    ----------
+    preprocess : sklearn transformer or pipeline
+        Preprocessing object to apply before model fitting.
+    cv : cross-validation splitter
+        Cross-validation object such as StratifiedKFold.
+    Xtrain : array-like or DataFrame
+        Training features.
+    ytrain : array-like or Series
+        Training labels.
+    scale_pos_weight : float or None, default=None
+        Positive-class weighting factor used to address class imbalance.
+    random_seed : int, default=42
+        Random seed for reproducibility.
+    n_iter : int, default=50
+        Number of random search iterations.
+    scoring : str, default="roc_auc"
+        Model selection metric.
+    n_jobs : int, default=-1
+        Number of parallel jobs.
 
-    Returns:
-    tuple: The fitted RandomizedSearchCV object, pipeline, and parameter grid.
-    '''
-
+    Returns
+    -------
+    tuple
+        (fitted RandomizedSearchCV object, pipeline, parameter grid)
+    """
     pipe = build_xgb_pipeline(
-        preprocess,
+        preprocess=preprocess,
         scale_pos_weight=scale_pos_weight,
-        random_seed=random_seed
+        random_seed=random_seed,
     )
 
     params = define_xgb_grid()
 
     xgb_cv = tune_xgb_model(
-        pipe,
-        params,
-        cv,
-        Xtrain,
-        ytrain,
+        pipe=pipe,
+        params=params,
+        cv=cv,
+        Xtrain=Xtrain,
+        ytrain=ytrain,
         n_iter=n_iter,
         scoring=scoring,
         random_seed=random_seed,
-        n_jobs=n_jobs
+        n_jobs=n_jobs,
     )
 
     return xgb_cv, pipe, params
