@@ -64,7 +64,7 @@ This includes:
 This output is designed for downstream use in dashboards (e.g., Tableau) and supports a facility lookup and risk-screening use case.
 
 ## Dashboard
-Accompanying the facility-level dataset is a Tableau dashboard which explores specific facility performance and various features associated with HAIs. This dashboard is accessible as a Tableau workbook within this repository and as a URL hosted on Tableau Public at https://public.tableau.com/app/profile/alysa.pugmire/viz/HealthcareAssociatedInfection/Dashboard and GitHub Pages at [INSERT GITHUB PAGE URL HERE.]
+Accompanying the facility-level dataset is a Tableau dashboard which explores specific facility performance and various features associated with HAIs. This dashboard is accessible as a Tableau workbook within this repository and as a URL hosted on Tableau Public at https://public.tableau.com/app/profile/alysa.pugmire/viz/HealthcareAssociatedInfection/Dashboard 
 
 ## Repository Structure
 ```text
